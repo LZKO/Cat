@@ -283,6 +283,17 @@ Raft也是分布式一致性协议，主要用来竞选主节点。
 #### 数据同步
 
 
+...
+
+
+
+### 参考
+
+[分布式]: https://github.com/CyC2018/CS-Notes/blob/master/notes/%E5%88%86%E5%B8%83%E5%BC%8F.md
+
+https://github.com/CyC2018/CS-Notes/blob/master/notes/%E5%88%86%E5%B8%83%E5%BC%8F.md
+
+
 
 
 
