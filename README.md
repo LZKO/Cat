@@ -5,3 +5,5 @@
 [集群](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/集群.md)
 
 [攻击技术](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/攻击技术.md)
+
+[缓存](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/缓存.md)
