@@ -1,5 +1,9 @@
 用于记录基础知识，可用于面试使用
 
+## 面向对象
+
+[设计模式](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/设计模式.md)
+
 ## 数据库
 
 [数据库系统原理](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/数据库系统原理.md)
