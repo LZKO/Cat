@@ -14,6 +14,8 @@
   - [HASH](#hash)
   - [ZSET](#zset)
 - [三、数据结构](#三、数据结构)
+  - [简单动态字符串（SDS）](#简单动态字符串（SDS）)
+  - [链表](#链表)
   - [字典](#字典)
   - [跳跃表](#跳跃表)
 - [四、使用场景](#四、使用场景)
@@ -207,42 +209,282 @@ OK
 
 ### 三、数据结构
 
+#### 简单动态字符串（SDS）
+
+Redis里，C字符串只会作为字符串字面量用在一些无需对字符串值进行修改的地方，比如打印日志。Redis构建了 简单动态字符串（simple dynamic string，SDS）来表示字符串值。
+
+在Redis里，包含字符串值的键值对在底层都是由SDS实现的。除此之外，SDS还被用作缓冲区：AOF缓冲区，客户端状态中的输入缓冲区。
+
+##### 1.SDS的定义
+
+每个sds.h/sdshdr结构表示一个SDS值：
+
+```
+struct sdshdr {
+  // 记录buf数组中已使用字节的数量
+  // 等于SDS所保存字符串的长度
+  int len;
+  
+  // 记录buf数组中未使用字节的数量
+  int free;
+  
+  // 字节数组，用于保存字符串
+  char buf[];
+}
+```
+
+SDS遵循C字符串以空字符结尾的管理，空字符不计算在len属性中。这样，SDS可以重用一部分C字符串函数库，如printf。
+
+##### 2.SDS与C字符串的区别
+
+- 常熟复杂度获取字符串长度
+
+  C字符串必须遍历整个字符串才能获得长度，复杂度是O(N)。
+
+  SDS在len属性中记录了SDS的长度，复杂度为O(1)。
+
+- 杜绝缓冲区溢出
+
+  C字符串不记录长度的带来的另一个问题是缓冲区溢出。假设s1和s2是紧邻的两个字符串，对s1的strcat操作，有可能污染s2的内存空间。
+
+  SDS的空间分配策略杜绝了缓冲区溢出的可能性：但SDS API修改SDS时，会先检查SDS的空间是否满足修改所需的要求，不满足的话，API会将SDS的空间扩展至执行修改所需的大小，然后再执行实际的修改操作。
+
+- 减少修改字符串时带来的内存重分配次数
+
+  每次增长或缩短一个C字符串，程序都要对保存这个C字符串的数组进行一次内存重分配操作。
+
+  Redis作为数据库，数据会被频繁修改，如果每次修改字符串都会执行一次内存重分配的话，会对性能造成影响。SDS通过未使用空间解除了字符串长度和底层数组长度之间的关联：在SDS中，buf数组的长度不一定就是字符数量加一，数组里面可以包含未使用的字节，由free属性记录。
+
+  对于未使用空间，SDS使用了空间预分配和惰性空间释放两种优化策略：
+
+  1. 空间预分配：当SDS的API对SDS修改并需要空间扩展时，程序不仅为SDS分配修改所需的空间，还会分配额外的未使用空间（分配的大小取决于长度是否小于1MB）。
+  2. 惰性空间释放：当SDS的API需要缩短时，程序不立即触发内存重分配，而是使用free属性将这些字节的数量记录下来，并等待将来使用。与此同时，SDS API也可以让我们真正释放未使用空间，防止内存浪费。
+
+- 二进制安全
+
+  C字符串中的字符必须复合某种编码（如ASCII），且除了字符串末尾之外，字符串里不能包含空字符。这些限制使得C字符串只能保存文本，而不能保存像图片、音频、视频、压缩文件这样的二进制数据。
+
+  SDS API会以处理二进制的方式处理SDS存放在buf数组中的数据，写入时什么样，读取时就是什么样。
+
+  这也是我们将SDS 的buf 属性称为字节数组的原因——Redis 不是用这个数组来保存字符，而是用它来保存一系列二进制数据。
+
+- 兼容部分C 字符串函数
+
+  遵循C字符串以空字符结尾的管理，SDS可以重用<string.h>函数库。
+
+总结：
+
+| C字符串                          | SDS                                |
+| -------------------------------- | ---------------------------------- |
+| 获取字符串长度的复杂度O(N)       | O(1)                               |
+| API不安全，可能会造成缓冲区溢出  | API安全，不会造成缓冲区溢出        |
+| 修改字符串长度必然导致内存重分配 | 修改字符串长度不一定导致内存重分配 |
+| 只能保存文本数据                 | 可以保存文本或二进制数据           |
+| 可使用所有<string.h>库的函数     | 可使用部分<string.h>库的函数       |
+
+##### 3.SDS API
+
+略
+
+#### 链表
+
+Redis构建了自己的链表实现。列表键的底层实现之一就是链表。发布、订阅、慢查询、监视器都用到了链表。Redis服务器还用链表保存多个客户端的状态信息，以及构建客户端输出缓冲区。
+
+##### 1.链表和链表节点的实现
+
+链表节点用adlist.h/listNode结构来表示
+
+```
+typedef struct listNode {
+  struct listNode *prev;
+  struct listNode *next; 
+  void *value;
+} listNode;
+```
+
+adlist.h/list来持有链表:
+
+```
+typedef struct list {
+  listNode *head;
+  listNode *tail;
+  unsigned long len;
+  void *(dup)(void *ptr); // 节点复制函数
+  void (*free)(void *ptr); // 节点释放函数
+  int (*match)(void *ptr, void *key); // 节点值对比函数
+} list;
+```
+
+Redis的链表实现可总结如下：
+
+1. 双向
+2. 无环。表头结点的prev和表尾节点的next都指向NULL
+3. 带表头指针和表尾指针
+4. 带链表长度计数器
+5. 多态。使用void*指针来保存节点值，并通过list结构的dup、free。match三个属性为节点值设置类型特定函数
+
+##### 2.链表和链表节点的API
+
+略
+
+
+
 #### 字典
 
-dictht 是一个散列表结构，使用拉链法解决哈希冲突。
+Redis的数据库就是使用字典来作为底层实现的，对数据库的增删改查都是构建在字典的操作之上。
+
+字典还是哈希键的底层实现之一，但一个哈希键包含的键值对比较多，又或者键值对中的元素都是较长的字符串时，Redis就会用字典作为哈希键的底层实现。
+
+##### 1.字典的实现
+
+Redis的字典使用**哈希表**作为底层实现，每个哈希表节点就保存了字典中的一个键值对。
+
+Redis字典所用的**哈希表**由dict.h/dictht结构定义：
 
 ```
-/* This is our hash table structure. Every dictionary has two of this as we
- * implement incremental rehashing, for the old to the new table. */
 typedef struct dictht {
-    dictEntry **table;
-    unsigned long size;
-    unsigned long sizemask;
-    unsigned long used;
+  // 哈希表数组
+  dict Entry **table;
+  // 哈希表大小
+  unsigned long size;
+  // 哈希表大小掩码，用于计算索引值，总是等于size - 1
+  unsigned long sizemask;
+  // 该哈希表已有节点的数量
+  unsigned long used;
 } dictht;
-typedef struct dictEntry {
-    void *key;
-    union {
-        void *val;
-        uint64_t u64;
-        int64_t s64;
-        double d;
-    } v;
-    struct dictEntry *next;
-} dictEntry;
 ```
 
-Redis 的字典 dict 中包含两个哈希表 dictht，这是为了方便进行 rehash 操作。在扩容时，将其中一个 dictht 上的键值对 rehash 到另一个 dictht 上面，完成之后释放空间并交换两个 dictht 的角色。
+**哈希表节点**使用dictEntry结构表示，每个dictEntry结构都保存着一个键值对：
+
+```
+typedef struct dictEntry {
+  void *key; // 键
+  
+  // 值
+  union {
+    void *val;
+    uint64_t u64;
+    int64_t s64;
+  } v;
+  
+  // 指向下个哈希表节点，形成链表。一次解决键冲突的问题
+  struct dictEntry *next;
+}
+```
+
+Redis中的**字典**由dict.h/dict结构表示：
 
 ```
 typedef struct dict {
-    dictType *type;
-    void *privdata;
-    dictht ht[2];
-    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
-    unsigned long iterators; /* number of iterators currently running */
+  dictType *type; // 类型特定函数
+  void *privdata; // 私有数据
+  
+  /*
+  哈希表
+  一般情况下，字典只是用ht[0]哈希表，ht[1]只会在对ht[0]哈希表进行rehash时是用
+  */
+  dictht ht[2]; 
+  
+  // rehash索引，但rehash不在进行时，值为-1
+  // 记录了rehash的进度
+  int trehashidx; 
 } dict;
 ```
+
+type和privdata是针对不同类型大家键值对，为创建多态字典而设置的：
+
+- type是一个指向dictType结构的指针，每个dictType都保存了一簇用于操作特定类型键值对的函数，Redis会为用途不同的字典设置不同的类型特定函数。
+- privdata保存了需要传给那些类型特定函数的可选参数。
+
+```
+typedef struct dictType {
+  // 计算哈希值的函数
+  unsigned int (*hashFunction) (const void *key);
+  
+  // 复制键的函数
+  void *(*keyDup) (void *privdata, const void *obj);
+  
+  // 对比键的函数
+  void *(*keyCompare) (void *privdata, const void *key1, const void *key2);
+  
+  // 销毁键的函数
+  void (*keyDestructor) (void *privdata, void *key);
+  
+  // 销毁值的函数
+  void (*valDestructor) (void *privdata, void *obj);
+} dictType;
+```
+
+##### 2.哈希算法
+
+Redis计算哈希值和索引值的方法如下：
+
+```
+# 使用字典设置的哈希函数，计算key的哈希值
+hash = dict.type.hashFucntion(key)
+# 使用哈希表的sizemask属性和哈希值，计算出索引值
+# 根据情况的不同，ht[x]可以使ht[0]或ht[1]
+index = hash & dict.ht[x].sizemask
+```
+
+当字典被用作数据库或哈希键的底层实现时，使用MurmurHash2算法来计算哈希值，即使输入的键是有规律的，算法人能有一个很好的随机分布性，计算速度也很快。
+
+##### 3.解决键冲突
+
+Redis使用链地址法解决键冲突，每个哈希表节点都有个next指针。
+
+##### 4.rehash
+
+随着操作的不断执行，哈希表保存的键值对会增加或减少。为了让哈希表的负载因子维持在合理范围，需要对哈希表的大小进行扩展或收缩，即通过执行rehash（重新散列）来完成：
+
+1. 为字典的ht[1]哈希表分配空间：
+
+   如果执行的是扩展操作，ht[1]的大小为第一个大于等于ht[0].used * 2 的2^n
+
+   如果执行的是收缩操作，ht[1]的大小为第一个大于等于ht[0].used的2^n
+
+2. 将保存在ht[0]中的所有键值对rehash到ht[1]上。rehash是重新设计的计算键的哈希值和索引值
+
+3. 释放ht[0]，将ht[1]设置为ht[0]，并为ht[1]新建一个空白哈希表
+
+**哈希表的扩展与收缩**
+
+满足一下任一条件，程序会自动对哈希表执行扩展操作：
+
+1. 服务器目前没有执行BGSAVE或BGREWRITEAOF，且哈希表负载因子大于等于1
+2. 服务器正在执行BGSAVE或BGREWRITEAOF，且负载因子大于5
+
+其中负载因子的计算公式：
+
+```
+# 负载因子 = 哈希表已保存节点数量 / 哈希表大小
+load_factor = ht[0].used / ht[0].size
+```
+
+注：执行BGSAVE或BGREWRITEAOF过程中，Redis需要创建当前服务器进程的子进程，而多数操作系统都是用写时复制来优化子进程的效率，所以在子进程存在期间，服务器会提高执行扩展操作所需的负载因子，从而尽可能地避免在子进程存在期间扩展哈希表，避免不避免的内存写入，节约内存。
+
+##### 5.渐进式rehash
+
+将ht[0]中的键值对rehash到ht[1]中的操作不是一次性完成的，而是分多次渐进式的：
+
+1. 为ht[1]分配空间
+2. 在字典中维持一个索引计数器变量rehashidx，设置为0，表示rehash工作正式开始
+3. rehash期间，**每次对字典的增删改查操作**，会顺带将ht[0]在rehashidx索引上的所有键值对rehash到ht[1]，rehash完成之后，rehashidx属性的值+1
+4. 最终ht[0]会全部rehash到ht[1]，这是将rehashidx设置为-1，表示rehash完成
+
+渐进式rehash过程中，字典会有两个哈希表，字典的增删改查会在两个哈希表上进行。
+
+##### 6.字典API
+
+略
+
+
+
+如下为旧版本
+
+dictht 是一个散列表结构，使用拉链法解决哈希冲突。
+
+Redis 的字典 dict 中包含两个哈希表 dictht，这是为了方便进行 rehash 操作。在扩容时，将其中一个 dictht 上的键值对 rehash 到另一个 dictht 上面，完成之后释放空间并交换两个 dictht 的角色。
 
 rehash 操作不是一次性完成，而是采用渐进方式，这是为了避免一次性执行过多的 rehash 操作给服务器带来过大的负担。
 
@@ -252,63 +494,91 @@ rehash 操作不是一次性完成，而是采用渐进方式，这是为了避�
 
 采用渐进式 rehash 会导致字典中的数据分散在两个 dictht 上，因此对字典的查找操作也需要到对应的 dictht 去执行。
 
-```
-/* Performs N steps of incremental rehashing. Returns 1 if there are still
- * keys to move from the old to the new hash table, otherwise 0 is returned.
- *
- * Note that a rehashing step consists in moving a bucket (that may have more
- * than one key as we use chaining) from the old to the new hash table, however
- * since part of the hash table may be composed of empty spaces, it is not
- * guaranteed that this function will rehash even a single bucket, since it
- * will visit at max N*10 empty buckets in total, otherwise the amount of
- * work it does would be unbound and the function may block for a long time. */
-int dictRehash(dict *d, int n) {
-    int empty_visits = n * 10; /* Max number of empty buckets to visit. */
-    if (!dictIsRehashing(d)) return 0;
-
-    while (n-- && d->ht[0].used != 0) {
-        dictEntry *de, *nextde;
-
-        /* Note that rehashidx can't overflow as we are sure there are more
-         * elements because ht[0].used != 0 */
-        assert(d->ht[0].size > (unsigned long) d->rehashidx);
-        while (d->ht[0].table[d->rehashidx] == NULL) {
-            d->rehashidx++;
-            if (--empty_visits == 0) return 1;
-        }
-        de = d->ht[0].table[d->rehashidx];
-        /* Move all the keys in this bucket from the old to the new hash HT */
-        while (de) {
-            uint64_t h;
-
-            nextde = de->next;
-            /* Get the index in the new hash table */
-            h = dictHashKey(d, de->key) & d->ht[1].sizemask;
-            de->next = d->ht[1].table[h];
-            d->ht[1].table[h] = de;
-            d->ht[0].used--;
-            d->ht[1].used++;
-            de = nextde;
-        }
-        d->ht[0].table[d->rehashidx] = NULL;
-        d->rehashidx++;
-    }
-
-    /* Check if we already rehashed the whole table... */
-    if (d->ht[0].used == 0) {
-        zfree(d->ht[0].table);
-        d->ht[0] = d->ht[1];
-        _dictReset(&d->ht[1]);
-        d->rehashidx = -1;
-        return 0;
-    }
-
-    /* More to rehash... */
-    return 1;
-}
-```
-
 #### 跳跃表
+
+跳跃表是一种**有序数据结构**，它通过在每个节点中维持多个指向其他节点的指针，从而达到快速访问的目的。跳跃表支持平均*O(logN)*、最坏*O(N)*的查找，还可以通过顺序性操作来批量处理节点。
+
+Redis使用跳跃表作为有序集合键的底层实现之一，如果有序集合包含的元素数量较多，或者有序集合中元素的成员是比较长的字符串时，Redis使用跳跃表来实现有序集合键。
+
+在集群节点中，跳跃表也被Redis用作内部数据结构。
+
+##### 1.跳跃表的实现
+
+Redis的跳跃表由redis.h/zskiplistNode和redis.h/zskiplist两个结构定义，其中zskiplistNode代表跳跃表节点，zskiplist保存跳跃表节点的相关信息，比如节点数量、以及指向表头/表尾结点的指针等。
+
+```
+typedef struct zskiplist {
+  struct zskiplistNode *header, *tail;
+  unsigned long length;
+  int leve;
+} zskiplist;
+```
+
+zskiplist结构包含：
+
+- header：指向跳跃表的表头结点
+- tail：指向跳跃表的表尾节点
+- level：记录跳跃表内，层数最大的那个节点的层数（表头结点不计入）
+- length：记录跳跃表的长度， 即跳跃表目前包含节点的数量（表头结点不计入）
+
+```
+typedef struct zskiplistNode {
+  struct zskiplistLevel {
+    struct zskiplistNode *forward;
+    unsigned int span; // 跨度
+  } level[];
+  
+  struct zskiplistNode *backward;
+  double score;
+  robj *obj;
+} zskiplistNode;
+```
+
+```
+typedef struct zskiplistNode {
+  struct zskiplistLevel {
+    struct zskiplistNode *forward;
+    unsigned int span; // 跨度
+  } level[];
+  
+  struct zskiplistNode *backward;
+  double score;
+  robj *obj;
+} zskiplistNode;
+```
+
+zskiplistNode包含：
+
+- level：节点中用L1、L2、L3来标记节点的各个层，每个层都有两个属性：前进指针和跨度。前进指针用来访问表尾方向的其他节点，跨度记录了前进指针所指向节点和当前节点的距离（图中曲线上的数字）。
+
+  level数组可以包含多个元素，每个元素都有一个指向其他节点的指针，程序可以通过这些层来加快访问其他节点。层数越多，访问速度就越快。没创建一个新节点的时候，根据幂次定律（越大的数出现的概率越小）随机生成一个介于1-32之间的值作为level数组的大小。这个大小就是层的高度。
+
+  跨度用来计算排位（rank）：在查找某个节点的过程中，将沿途访问过的所有层的跨度累计起来，得到就是目标节点的排位。
+
+- 后退指针：BW，指向位于当前节点的前一个节点。只能回退到前一个节点，不可跳跃。
+
+- 分值（score）：节点中的1.0/2.0/3.0保存的分值，节点按照各自保存的分值从小到大排列。节点的分值可以相同。
+
+- 成员对象（obj）：节点中的o1/o2/o3。它指向一个字符串对象，字符串对象保存着一个SDS值。
+
+注：表头结点也有后退指针、分值和成员对象，只是不被用到。
+
+遍历所有节点的路径：
+
+1. 访问跳跃表的表头，然后从第四层的前景指正到表的第二个节点。
+2. 在第二个节点时，沿着第二层的前进指针到表中的第三个节点。
+3. 在第三个节点时，沿着第二层的前进指针到表中的第四个节点。
+4. 但程序沿着第四个程序的前进指针移动时，遇到NULL。结束遍历。
+
+
+
+
+
+
+
+
+
+如下为旧版本
 
 是有序集合的底层实现之一。
 
