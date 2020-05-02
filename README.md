@@ -2,6 +2,8 @@
 
 ## 面向对象
 
+[面向对象思想](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/面向对象思想.md)
+
 [设计模式](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/设计模式.md)
 
 ## 数据库
