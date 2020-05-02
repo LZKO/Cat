@@ -1,5 +1,17 @@
 用于记录基础知识，可用于面试使用
 
+## 算法
+略
+
+剑指 Offer 题解：[参考](https://github.com/CyC2018/CS-Notes/blob/master/notes/%E5%89%91%E6%8C%87%20Offer%20%E9%A2%98%E8%A7%A3%20-%20%E7%9B%AE%E5%BD%95.md)
+
+Leetcode 题解：[参考](https://github.com/CyC2018/CS-Notes/blob/master/notes/Leetcode%20%E9%A2%98%E8%A7%A3%20-%20%E7%9B%AE%E5%BD%95.md)
+
+算法：[参考](https://github.com/CyC2018/CS-Notes/blob/master/notes/%E7%AE%97%E6%B3%95%20-%20%E7%9B%AE%E5%BD%95.md)
+
+笔试面试题库：[参考](https://www.nowcoder.com/contestRoom?from=cyc_github)
+
+
 ## 操作系统
 
 [计算机操作系统](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/计算机操作系统.md)
