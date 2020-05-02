@@ -2,6 +2,7 @@
 
 ## 操作系统
 
+[计算机操作系统](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/计算机操作系统.md)
 
 [Linux](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Linux.md)
 
