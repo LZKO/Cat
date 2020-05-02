@@ -1,5 +1,16 @@
 用于记录基础知识，可用于面试使用
 
+## 数据库
+
+[SQL](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/SQL.md)
+
+Leetcode-Database 题解：略，可以参考此链接
+[参考链接](https://github.com/CyC2018/CS-Notes/blob/master/notes/Leetcode-Database%20%E9%A2%98%E8%A7%A3.md)
+
+[MySQL](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/MySQL.md)
+
+[Redis](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Redis.md)
+
 ## Java
 
 [Java 基础](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Java%20基础.md)
