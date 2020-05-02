@@ -1,5 +1,10 @@
 用于记录基础知识，可用于面试使用
 
+## 网络
+
+
+[Socket](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Socket.md)
+
 ## 面向对象
 
 [面向对象思想](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/面向对象思想.md)
