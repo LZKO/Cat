@@ -1168,7 +1168,89 @@ RDB文件的载入工作在服务器启动时自动执行。
 
 载入RDB文件的工作由`rdb.c/rdbLoad`函数完成。载入RDB文件期间，服务器一直处于阻塞状态。
 
+##### 2.自动间隔性保存
 
+Redis允许用户通过设置服务器配置的save选项，每隔一段时间执行一次BGSAVE命令。配置如下：
+
+> save 900 1
+>
+> save 300 10
+>
+> save 60 10000
+
+那么上述三个条件只要满足任意一个，BGSAVE命令就会被执行：
+
+1. 服务器在900秒内，对服务器进行了至少1次修改。
+2. 服务器在300秒内，对服务器进行了至少10次修改。
+3. 服务器在60秒内，对服务器进行了至少10000次修改。
+
+当Redis服务器启动时，用户可以指定配置文件或者传入启动参数的方式设置save选项。如果没有主动设置，服务器默认使用上述三个条件。接着，服务器会根据save的条件，设置`redisServer`结构的`saveParams`属性。
+
+```
+struct redisServer {
+  // ...
+  struct saveparam *saveparams; // 保存条件的数组
+  long long dirty;
+  time_t lastsave;
+  //...
+}
+
+struct saveparam {
+  time_t seconds; // 秒数
+  int changes; // 修改数
+}
+```
+
+除此之外，服务器还维持着一个dirty计数器，以及一个lastsave属性。
+
+- dirty记录上一次成功`SAVE`或`BGSAVE`之后，服务器对数据库状态进行了多少次修改。
+- lastsave是一个UNIX时间戳，记录了服务器上一次成功`SAVE`或`BGSAVE`的时间。
+
+###### 检查保存条件是否满足
+
+服务器的周期性操作函数`serverCron`默认每个100毫秒就会执行一次，其中一项工作是检查save选项所设置的保存条件是否满足。
+
+##### 3.RDB文件结构
+
+RDB文件的各个部分包括：
+
+> REDIS | db_version | databases | EOF | check_sum
+
+###### REDIS
+
+开头是REDIS部分，长度为5。保存了五个字符，以便载入时确认是否为RDB文件。
+
+###### db_version
+
+db_version长4字节，是一个字符串表示的整数，记录了RDB文件的版本号。
+
+###### databases
+
+databases部分包含了0个或多个数据库，以及各个数据库中的键值对数据。一个保存了0号和3号数据库的RDB文件如下：
+
+> REDIS | db_version | database 0 | databse 3 | EOF | check_sum
+
+每个非空数据库在RDB文件中都可保存为以下三部分：
+
+> SELECTDB | db_number | key_value_pairs
+
+- SELECTEDB。1字节。但程序遇到这个值的时候，它就知道接下来要读入的将是一个数据库号码。
+- db_number。读取号码之后，服务器会调用`SELECT`命令切换数据库。
+- key_value_pairs。不带过期时间的键值对在RDB文件中包括TYPE、key、value。TYPE的值决定了如何读入和解释value的数据。带过期时间的键值对增加了EXPIRETIME_MS和ms。前者告知程序接下来要读入一个UNIX时间戳。
+
+###### EOF
+
+长度为1字节，标识RDB文件结束。
+
+###### check_sum
+
+8字节的无符号整数，保存着一个前面四个部分的校验和。
+
+##### 4.分析RDB文件
+
+od命令分析RDB文件。-c参数可以以ASCII编码打印文件。
+
+Redis自带的文件检查工具是redis-check-dump。
 
 #### AOF 持久化
 
