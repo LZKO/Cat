@@ -173,6 +173,21 @@ public static void main(String[] args) {
 }
 ```
 
+在创建线程池时不允许使用 `Executors` 去创建，而是通过 `ThreadPoolExecutor` 的方式，这样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险。`Executors` 返回线程池对象的弊端如下：
+
+- **FixedThreadPool** 和 **SingleThreadExecutor** ： 允许请求的队列长度为 Integer.MAX_VALUE ，可能堆积大量的请求，从而导致OOM。
+- **CachedThreadPool** 和 **ScheduledThreadPool** ： 允许创建的线程数量为 Integer.MAX_VALUE ，可能会创建大量线程，从而导致OOM。
+
+`ThreadPoolExecutor` 构造函数重要参数：
+
+- **corePoolSize** : 核心线程数线程数定义了最小可以同时运行的线程数量。
+- **maximumPoolSize** : 当队列中存放的任务达到队列容量的时候，当前可以同时运行的线程数量变为最大线程数。
+- **workQueue**: 当新任务来的时候会先判断当前运行的线程数量是否达到核心线程数，如果达到的话，新任务就会被存放在队列中。
+- **keepAliveTime**：当线程池中的线程数量大于 corePoolSize 的时候，如果这时没有新的任务提交，核心线程外的线程不会立即销毁，而是会等待，直到等待的时间超过了 keepAliveTime才会被回收销毁；
+- **unit** ：keepAliveTime 参数的时间单位。
+- **threadFactory** ：executor 创建新线程的时候会用到。
+- **handler** ：饱和策略。
+
 #### Daemon
 
 守护线程是程序运行时在后台提供服务的线程，不属于程序中不可或缺的部分。
