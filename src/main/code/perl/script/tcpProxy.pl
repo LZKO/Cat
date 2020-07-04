@@ -14,7 +14,7 @@ my $ifDeamon = 0;
 my $dbinfo = <<_DB_;
     ad = ****.local:389
     devmail = devsmtprelay.****.com.cn:25
-    test = 10.31.224.226:6613
+    test = 10.**.**.**:6613
 
 _DB_
 my $usage = <<_USAGE_;
