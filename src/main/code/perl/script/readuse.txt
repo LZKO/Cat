@@ -1,8 +1,0 @@
-运行方法
-./tcpProxy.pl -s test -p 16613 -d 1
-
-----------------------------------
-linux上安装perl 的Proxy
-yum search Proxy
-cpan
-perl -e "use Net::Proxy"
