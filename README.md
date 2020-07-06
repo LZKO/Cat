@@ -71,6 +71,14 @@ Leetcode-Database 题解：略，可以参考此链接
 
 [消息队列](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/消息队列.md)
 
+[Kafka](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Kafka.md)
+
+[Zookeeper](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Zookeeper.md)
+
+[MyBatis](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/MyBatis.md)
+
+[Spring](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Spring.md)
+
 ## 工具
 
 [Git](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Git.md)
