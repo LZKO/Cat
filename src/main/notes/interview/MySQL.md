@@ -409,6 +409,15 @@ ACID
 
 并发处理：也就是说当多个并发请求过来，并且其中有一个请求是对数据修改操作的时候会有影响，为了避免读到脏数据，所以需要对事务之间的读写进行隔离，至于隔离到啥程度得看业务系统的场景了，实现这个就得用MySQL 的隔离级别。
 
+下面我首先讲实现事务功能的三个技术，分别是日志文件(redo log 和 undo log)，锁技术以及MVCC，然后再讲事务的实现原理，包括原子性是怎么实现的，隔离型是怎么实现的等等。最后在做一个总结，希望大家能够耐心看完
+
+- redo log与undo log介绍
+- mysql锁技术以及MVCC基础
+- 事务的实现原理
+- 总结
+
+**一、redo log与undo log介绍**
+
 **1、redo log**
 
 **什么是redo log ?**
@@ -440,6 +449,199 @@ undo log 记录事务修改之前版本的数据信息，因此假如由于系�
 **总结：**
 
 undo log是用来回滚数据的用于保障 未提交事务的原子性
+
+**二、mysql锁技术以及MVCC基础**
+
+**1. mysql锁技术**
+
+当有多个请求来读取表中的数据时可以不采取任何操作，但是多个请求里有读请求，又有修改请求时必须有一种措施来进行并发控制。不然很有可能会造成不一致。
+
+读写锁
+
+解决上述问题很简单，只需用两种锁的组合来对读写请求进行控制即可，这两种锁被称为：
+
+共享锁(shared lock),又叫做"读锁"
+
+读锁是可以共享的，或者说多个读请求可以共享一把锁读数据，不会造成阻塞。
+
+排他锁(exclusive lock),又叫做"写锁"
+
+写锁会排斥其他所有获取锁的请求，一直阻塞，直到写入完成释放锁。
+
+**![img](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9tbWJpei5xcGljLmNuL3N6X21tYml6X2pwZy9IVjR5VEk2UGpiSnVDWWZWUTF6U1ZxVEo4cWlia29CVHVETTZ5OW1NMmJ5VENtWGJkSHdjbGlibFZlWjFMNEdqWHBhZjV3SGhDMERVRjZvTHV1d1VaSTd3LzY0MA?x-oss-process=image/format,png)**
+
+总结：
+
+通过读写锁，可以做到读读可以并行，但是不能做到写读，写写并行
+
+事务的隔离性就是根据读写锁来实现的！！！这个后面再说。
+
+**2. MVCC基础**
+
+MVCC (MultiVersion Concurrency Control) 叫做多版本并发控制。
+
+InnoDB的 MVCC ，是通过在每行记录的后面保存两个隐藏的列来实现的。这两个列，一个保存了行的创建时间，一个保存了行的过期时间，当然存储的并不是实际的时间值，而是系统版本号
+
+以上片段摘自《高性能Mysql》这本书对MVCC的定义。他的主要实现思想是通过数据多版本来做到读写分离。从而实现不加锁读进而做到读写并行。
+
+MVCC在mysql中的实现依赖的是undo log与read view
+
+- undo log :undo log 中记录某行数据的多个版本的数据。
+- read view :用来判断当前版本数据的可见性
+
+**![img](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9tbWJpei5xcGljLmNuL3N6X21tYml6X2pwZy9IVjR5VEk2UGpiSnVDWWZWUTF6U1ZxVEo4cWlia29CVHVhMlJYaWJNRlZsa0FkY293WWRRdkZEcGpmcXBXTzNFN3hrRXQ4TnRNNXJzNkVKdGlhUkg1R3ZjUS82NDA?x-oss-process=image/format,png)**
+
+
+
+
+
+**三、事务的实现**
+
+前面讲的重做日志，回滚日志以及锁技术就是实现事务的基础。
+
+事务的原子性是通过undolog来实现的，事务的持久性是通过redolog来实现的，事务的隔离性是通过(读写锁+MVCC)来实现的，而事务的终极大 boss 一致性是通过原子性，持久性，隔离性来实现的。
+
+原子性，持久性，隔离性折腾半天的目的也是为了保障数据的一致性！
+
+总之，ACID只是个概念，事务最终目的是要保障数据的可靠性，一致性。
+
+**1.原子性的实现**
+
+**1.1 undo log 的生成**
+
+- 1.每条数据变更(insert/update/delete)操作都伴随一条undo log的生成,并且回滚日志必须先于数据持久化到磁盘上
+
+- 2.所谓的回滚就是根据回滚日志做逆向操作，比如delete的逆向操作为insert，insert的逆向操作为delete，update的逆向为update等。
+
+为什么先写日志后写数据库？
+
+**1.2 根据undo log 进行回滚**
+
+为了做到同时成功或者失败，当系统发生错误或者执行rollback操作时需要根据undo log 进行回滚
+
+回滚操作就是要还原到原来的状态，undo log记录了数据被修改前的信息以及新增和被删除的数据信息，根据undo log生成回滚语句，比如：
+
+(1) 如果在回滚日志里有新增数据记录，则生成删除该条的语句
+
+(2) 如果在回滚日志里有删除数据记录，则生成生成该条的语句
+
+(3) 如果在回滚日志里有修改数据记录，则生成修改到原先数据的语句
+
+**2.持久性的实现**
+
+先了解一下MySQL的数据存储机制，MySQL的表数据是存放在磁盘上的，因此想要存取的时候都要经历磁盘IO,然而即使是使用SSD磁盘IO也是非常消耗性能的。为此，为了提升性能InnoDB提供了缓冲池(Buffer Pool)，Buffer Pool中包含了磁盘数据页的映射，可以当做缓存来使用：
+
+读数据：会首先从缓冲池中读取，如果缓冲池中没有，则从磁盘读取再放入缓冲池；
+
+写数据：会首先写入缓冲池，缓冲池中的数据会定期同步到磁盘中；
+
+上面这种缓冲池的措施虽然在性能方面带来了质的飞跃，但是它也带来了新的问题，当MySQL系统宕机，断电的时候可能会丢数据！！！
+
+因为我们的数据已经提交了，但此时是在缓冲池里头，还没来得及在磁盘持久化，所以我们急需一种机制需要存一下已提交事务的数据，为恢复数据使用。
+
+所以引入了redo log来记录已成功提交事务的修改信息，并且会把redo log持久化到磁盘，系统重启之后在读取redo log恢复最新数据。
+
+既然redo log也需要存储，也涉及磁盘IO为啥还用它？
+
+（1）redo log 的存储是顺序存储，而缓存同步是随机操作。
+
+（2）缓存同步是以数据页为单位的，每次传输的数据大小大于redo log。
+
+**3.隔离性实现**
+
+MySQL隔离级别有以下四种（级别由低到高）：
+
+1. READUNCOMMITED(未提交读)
+2. READCOMMITED(提交读)
+3. REPEATABLEREAD(可重复读)
+4. SERIALIZABLE (可重复读)
+
+**READ UNCOMMITTED**
+
+在READ UNCOMMITTED隔离级别下，事务中的修改即使还没提交，对其他事务是可见的。事务可以读取未提交的数据，造成脏读。
+
+因为读不会加任何锁，所以写操作在读的过程中修改数据，所以会造成脏读。好处是可以提升并发处理性能，能做到读写并行。
+
+换句话说，读的操作不能排斥写请求。
+
+优点：读写并行，性能高
+
+缺点：造成脏读
+
+**READ COMMITTED**
+
+一个事务的修改在他提交之前的所有修改，对其他事务都是不可见的。其他事务能读到已提交的修改变化。在很多场景下这种逻辑是可以接受的。
+
+InnoDB在 READ COMMITTED，使用排它锁,读取数据不加锁而是使用了MVCC机制。或者换句话说他采用了读写分离机制。
+
+但是该级别会产生不可重读以及幻读问题。
+
+什么是不可重读？
+
+在一个事务内多次读取的结果不一样。
+
+为什么会产生不可重复读？
+
+这跟 READ COMMITTED 级别下的MVCC机制有关系，在该隔离级别下每次 select的时候新生成一个版本号，所以每次select的时候读的不是一个副本而是不同的副本。
+
+在每次select之间有其他事务更新了我们读取的数据并提交了，那就出现了不可重复读
+
+**REPEATABLE READ(Mysql默认隔离级别)**
+
+在一个事务内的多次读取的结果是一样的。这种级别下可以避免，脏读，不可重复读等查询问题。mysql 有两种机制可以达到这种隔离级别的效果，分别是采用读写锁以及MVCC。
+
+采用读写锁实现：
+
+**![img](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9tbWJpei5xcGljLmNuL3N6X21tYml6X2pwZy9IVjR5VEk2UGpiSnVDWWZWUTF6U1ZxVEo4cWlia29CVHV6MzBkU3hHUTFoajJtSXdwQzkwSWE5MkRIT0VQNTF3bzhPbThpYXU3WlJLNWgxWHppY3MyTmlhZ3cvNjQw?x-oss-process=image/format,png)**
+
+为什么能可重复读？只要没释放读锁，在次读的时候还是可以读到第一次读的数据。
+
+优点：实现起来简单
+
+缺点：无法做到读写并行
+
+采用MVCC实现：
+
+**![img](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9tbWJpei5xcGljLmNuL3N6X21tYml6X2pwZy9IVjR5VEk2UGpiSnVDWWZWUTF6U1ZxVEo4cWlia29CVHVTRXhBdWNWQ1REY0wzTEZMczAxaWFZalJTNDNEc2hGMUkxWEcySWlhQXBLQWFQaHcyTWJSekNOUS82NDA?x-oss-process=image/format,png)**
+
+为什么能可重复读？因为多次读取只生成一个版本，读到的自然是相同数据。
+
+优点：读写并行
+
+缺点：实现的复杂度高
+
+但是在该隔离级别下仍会存在幻读的问题，关于幻读的解决我打算另开一篇来介绍。
+
+**SERIALIZABLE**
+
+该隔离级别理解起来最简单，实现也最简单。在隔离级别下除了不会造成数据不一致问题，没其他优点。
+
+**![img](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9tbWJpei5xcGljLmNuL3N6X21tYml6X2pwZy9IVjR5VEk2UGpiSnVDWWZWUTF6U1ZxVEo4cWlia29CVHU4Skl0ODZ6M09VQzB2cm02Z3BkU2VYeFFqQjZOR2o4Y1gwaWFPd0V1Q3FMamY2VGljQk8zNktzQS82NDA?x-oss-process=image/format,png)**
+
+![img](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9tbWJpei5xcGljLmNuL3N6X21tYml6X2pwZy9IVjR5VEk2UGpiSnVDWWZWUTF6U1ZxVEo4cWlia29CVHV0cjA2SEdDN213Q0J5aWNpYWczblV0a2lhZGRVZFloYlhCSlVVeFhpYTd3WVhRM1lhNmlhdjBpYnlhVEEvNjQw?x-oss-process=image/format,png)--摘自《高性能Mysql》
+
+**4.一致性的实现**
+
+数据库总是从一个一致性的状态转移到另一个一致性的状态。
+
+通过回滚，以及恢复，和在并发环境下的隔离做到一致性
+
+
+
+**总结**
+
+本出发点是想讲一下Mysql的事务的实现原理。
+
+实现事务采取了哪些技术以及思想？
+
+- 原子性：使用 undo log ，从而达到回滚
+- 持久性：使用 redo log，从而达到故障后恢复
+- 隔离性：使用锁以及MVCC,运用的优化思想有读写分离，读读并行，读写并行
+- 一致性：通过回滚，以及恢复，和在并发环境下的隔离做到一致性。
+
+
+
+
 
 
 
