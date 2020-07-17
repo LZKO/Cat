@@ -1427,6 +1427,51 @@ JDK 1.6 引入了偏向锁和轻量级锁，从而让锁拥有了四个状态：
 - 使用本地变量和不可变类来保证线程安全。
 - 使用线程池而不是直接创建线程，这是因为创建线程代价很高，线程池可以有效地利用有限的线程来启动任务。
 
+### 十四、面试题
+
+##### 1、自旋锁 互斥锁 分布式锁 及适用场景
+
+
+
+##### 2、讲讲线程池核心参数?
+
+`ThreadPoolExecutor` 构造函数重要参数：
+
+- **corePoolSize** : 核心线程数线程数定义了最小可以同时运行的线程数量。
+
+- **maximumPoolSize** : 当队列中存放的任务达到队列容量的时候，当前可以同时运行的线程数量变为最大线程数。
+
+- **workQueue**: 当新任务来的时候会先判断当前运行的线程数量是否达到核心线程数，如果达到的话，新任务就会被存放在队列中。
+
+  在线程池中常用的阻塞队列有以下几种：
+
+  - ​    同步移交：SynchronousQueue<Runnable>：此队列中不缓存任何一个任务。向线程池提交任务时，如果没有空闲线程来运行任务，则入列操作会阻塞。当有线程来获取任务时，出列操作会唤醒执行入列操作的线程。从这个特性来看，SynchronousQueue是一个无界队列，因此当使用SynchronousQueue作为线程池的阻塞队列时，参数maximumPoolSizes没有任何作用。
+
+  - 无界队列：LinkedBlockingQueue<Runnable>：顾名思义是用链表实现的队列，可以是有界的，也可以是无界的，但在Executors中默认使用无界的。
+  - 有界队列：ArrayBlockingQueue、LinkedBlockingQueue、PriorityBlockingQueue。
+
+- **keepAliveTime**：当线程池中的线程数量大于 corePoolSize 的时候，如果这时没有新的任务提交，核心线程外的线程不会立即销毁，而是会等待，直到等待的时间超过了 keepAliveTime才会被回收销毁；
+
+  为了解释keepAliveTime的作用，我们在上述情况下做一种假设。假设线程池这个单位已经招了些临时工，但新任务没有继续增加，所以随着每个员工忙完手头的工作，都来workQueue领取新的任务（看看这个单位的员工多自觉啊）。随着各个员工齐心协力，任务越来越少，员工数没变，那么就必定有闲着没事干的员工。这样的话领导不乐意啦，但是又不能轻易fire没事干的员工，因为随时可能有新任务来，于是领导想了个办法，设定了keepAliveTime，当空闲的员工在keepAliveTime这段时间还没有找到事情干，就被辞退啦，毕竟地主家也没有余粮啊！当然辞退到corePoolSize个员工时就不再辞退了，领导也不想当光杆司令啊！
+
+- **unit** ：keepAliveTime 参数的时间单位。
+
+- **threadFactory** ：executor 创建新线程的时候会用到。
+
+- **handler** ：饱和策略。表示当workQueue已满，且池中的线程数达到maximumPoolSize时，线程池拒绝添加新任务时采取的策略。
+
+  为了解释handler的作用，我们在上述情况下做另一种假设。假设线程池这个单位招满临时工，但新任务依然继续增加，线程池从上到下，从里到外真心忙的不可开交，阻塞队列也满了，只好拒绝上级委派下来的任务。怎么拒绝是门艺术，handler一般可以采取以下四种取值。
+
+  | ThreadPoolExecutor.AbortPolicy()         | 抛出RejectedExecutionException异常             |
+  | ---------------------------------------- | ---------------------------------------------- |
+  | ThreadPoolExecutor.CallerRunsPolicy()    | 由向线程池提交任务的线程来执行该任务           |
+  | ThreadPoolExecutor.DiscardOldestPolicy() | 抛弃最旧的任务（最先提交而没有得到执行的任务） |
+  | ThreadPoolExecutor.DiscardPolicy()       | 抛弃当前的任务                                 |
+
+
+
+
+
 ### 参考资料
 
 - BruceEckel. Java 编程思想: 第 4 版 [M]. 机械工业出版社, 2007.
