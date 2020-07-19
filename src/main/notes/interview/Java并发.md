@@ -1556,7 +1556,7 @@ ReentrantLock 默认采用非公平锁，除非你在构造方法中传入参数
 
 相对来说，非公平锁会有更好的性能，因为它的吞吐量比较大。当然，非公平锁让获取锁的时间变得更加不确定，可能会导致在阻塞队列中的线程长期处于饥饿状态。
 
-[AQS源码导读](#AQS源码导读)
+[AQS源码导读](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/AQS源码导读.md)
 
 
 
