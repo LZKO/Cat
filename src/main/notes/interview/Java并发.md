@@ -837,7 +837,7 @@ AbstractQueuedSynchronizer 的等待队列示意如下所示，注意了，之�
 
 ![aqs-0](https://www.javadoop.com/blogimages/AbstractQueuedSynchronizer/aqs-0.png)
 
-![1595149489187](E:\project_workspace\Cat\src\main\notes\interview\assets\1595149489187.png)
+![1595149489187](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/assets/1595149489187.png)
 
 （PS：上图为测试本地图片上传）
 
