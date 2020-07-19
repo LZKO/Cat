@@ -1048,6 +1048,14 @@ public final class ConcurrentCache<K, V> {
 }
 ```
 
+### 四、面试题
+
+##### 1、讲讲HashMap扩容阈值?
+
+0.75
+
+
+
 ### 参考资料
 
 - Eckel B. Java 编程思想 [M]. 机械工业出版社, 2002.
