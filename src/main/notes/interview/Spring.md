@@ -106,11 +106,189 @@ bean 的获取过程：先从一级获取，失败再从二级、三级里面获
 - ViewResolver：视图解析器，将 ModelAndView 逻辑视图解析为具体的视图（如 JSP）。
 - Handler：后端处理器，对用户具体请求进行处理，也就是我们编写的 Controller 类。
 
+### 3、Spring @Transaction失效场景
 
+参考：<https://blog.csdn.net/justLym/article/details/105040531>
 
+**3.1、@Transcational可以作用在接口、类、类方法。**
 
+作用类：当把@Transcational注解放在类上时，表示所有该类的public方法都配置上相同的事物属性
+作用方法：当配置了@Transcational，方法也配置了@Transcational,那么方法上的事物属性会覆盖掉类上声明的事物属性。
+作用接口：不推荐这种使用方式，因为一旦标注在Interface上并且配置了Spring AOP使用CGLib动态代理，将会导致@Transcational失效
+3.2、**@Transcational`有哪些属性**
 
+3.2.1、`propagation`属性
 
+propagation代表事物传播行为，默认值为Propagation.REQUIRE
+
+- Propagation.REQUIRE：如果当前存在事物，则加入当前事物，如果不存在事物，则创建一个新的事物。（也就是说，A和B方法都添加了事物注解，在A方法调用了B方法，那么B方法则会加入A方法的事物当中去，把这两个事物合并成一个事物。）
+- Propagation.SUPPORTS：如果当前存在事物，则加入当前事物运行，如果不存在事物，则以非事物方式运行。
+- Propagation.MANDATORY：如果当前存在事物，则加入当前事物运行，如果不存在事物，则抛出异常。
+- Propagation.REQUIRES_NEW：重新创建一个新的事物，如果当前存在事物，暂停当前事物。（当类A中的a方法用默认事物传播行为
+- Propagation.REQUIRE，类B中的b方法加上采用Propagation.REQUIRES_NEW事物传播行为，然后在a方法中调用b方法，然而a方法抛出异常了，b方法并没有回滚，因为Propagation.REQUIRES_NEW会暂停a方法中的事物）
+- Propagation.NOT_SUPPORTED：以非事物的方式运行，如果当前存在事物，则暂停当前事物。
+- Propagation.NEVER：始终以非事物的方式运行，如果当前存在事物，则抛出异常。
+- Propagation.NESTED：和Propagation.REQUIRE效果一样。
+
+3.2.2、`isolation`属性
+
+isolation:事物的隔离级别，默认值为Isolation.DEFAULT
+
+- Isolation.DEFAULT：使用数据库默认的隔离级别
+- Isolation.READ_UNCOMMITTED：读未提交
+- Isolation.READ_COMMITTED：读已提交
+- Isolation.REPEATABLE_READ：可重复读
+- Isolation.SERIALIZABLE：串行化
+
+3.2.3、`timeout`属性
+
+timout：事物超时时间，默认为-1。如果超过等待的时间但事物还没有完成，自动回滚事物
+
+3.2.4、`readOnly`属性
+
+readOnly：指定事物是否为只读事物，默认值为false；为了忽略那些不需要事物的方法，比如读取数据，可以设置read-only为true。
+
+3.2.5、`rollbackFor`属性
+
+rollbackFor：抛出指定的异常类型，回滚事物，也可以指定多个异常类型
+
+3.2.6、`noRollbackFor`属性
+
+noRollbackFor：抛出指定的异常类型，不会滚事物，也可以指定多个异常类型
+
+**3.3、`@Transcational`失效的场景**
+
+结合具体代码分析哪些场景，@Transcational注解会失效
+
+3.3.1、`@Transcational`应用在非public修饰的方法上，Transcational将会失效。
+
+![拦截器](https://img-blog.csdnimg.cn/20200323140227253.jpg?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2p1c3RMeW0=,size_16,color_FFFFFF,t_70)
+
+之所以会失效是因为在Spring AOP代理时，如上图所示TranscationInterceptor（事物拦截器）在目标方法执行前后进行拦截，DynamicAdvisedInterceptor（CglibAopProxy的内部类）的intercept方法或JdkDynamicAopPorxy的invoke方法间接调用
+AbstractFallbackTransactionAttributeSource的 computeTransactionAttribute 方法，获取Transactional 注解的事务配置信息。
+
+```java
+protected TransactionAttribute computeTransactionAttribute(Method method,
+    Class<?> targetClass) {
+        // Don't allow no-public methods as required.
+        if (allowPublicMethodsOnly() && !Modifier.isPublic(method.getModifiers())) {
+        return null;
+}
+```
+
+此方法会检查目标方法的修饰符是否为 public，不是 public则不会获取@Transactional 的属性配置信息。
+注意：protected、private 修饰的方法上使用 @Transactional 注解，虽然事务无效，但不会有任何报错，这是我们很容犯错的一点。
+
+3.3.2、@Transcational注解属性propagation设置错误，事务将不会发生回滚。
+
+- TransactionDefinition.PROPAGATION_SUPPORTS：如果当前存在事务，则加入该事务；如果当前没有事务，则以非事务的方式继续运行
+- TransactionDefinition.PROPAGATION_NOT_SUPPORTED：以非事务方式运行，如果当前存在事务，则把当前事务挂起。
+- TransactionDefinition.PROPAGATION_NEVER：以非事务方式运行，如果当前存在事务，则抛出异常。
+
+3.3.3、@Transactional 注解属性 rollbackFor 设置错误
+
+rollbackFor 可以指定能够触发事务回滚的异常类型。Spring默认抛出了未检查unchecked异常（继承自 RuntimeException 的异常）或者 Error才回滚事务；其他异常不会触发回滚事务。如果在事务中抛出其他类型的异常，但却期望 Spring 能够回滚事务，就需要指定 rollbackFor属性。
+
+```java
+// 希望自定义的异常可以进行回滚
+@Transactional(propagation= Propagation.REQUIRED,rollbackFor= MyException.class
+```
+
+若在目标方法中抛出的异常是 rollbackFor 指定的异常的子类，事务同样会回滚。Spring源码如下：
+
+```java
+private int getDepth(Class<?> exceptionClass, int depth) {
+    if (exceptionClass.getName().contains(this.exceptionName)) {
+        // Found it!
+        return depth;
+    }
+    // If we've gone as far as we can go and haven't found it...
+    if (exceptionClass == Throwable.class) {
+        return -1;
+    }
+	return getDepth(exceptionClass.getSuperclass(), depth + 1);
+}
+```
+
+3.3.4、同一个类中方法调用，导致@Transactional失效
+
+开发中避免不了会对同一个类里面的方法调用，比如有一个类Test，它的一个方法A，A再调用本类的方法B（不论方法B是用public还是private修饰），但方法A没有声明注解事务，而B方法有。则外部调用方法A之后，方法B的事务是不会起作用的。这也是经常犯错误的一个地方。
+
+那为啥会出现这种情况？其实这还是由于使用Spring AOP代理造成的，因为只有当事务方法被当前类以外的代码调用时，才会由Spring生成的代理对象来管理。
+
+```java
+//@Transactional
+    @GetMapping("/test")
+    private Integer A() throws Exception {
+        CityInfoDict cityInfoDict = new CityInfoDict();
+        cityInfoDict.setCityName("2");
+        /**
+         * B 插入字段为 3的数据
+         */
+        this.insertB();
+        /**
+         * A 插入字段为 2的数据
+         */
+        int insert = cityInfoDictMapper.insert(cityInfoDict);
+
+        return insert;
+    }
+
+    @Transactional()
+    public Integer insertB() throws Exception {
+        CityInfoDict cityInfoDict = new CityInfoDict();
+        cityInfoDict.setCityName("3");
+        cityInfoDict.setParentCityId(3);
+
+        return cityInfoDictMapper.insert(cityInfoDict);
+    }
+```
+
+3.3.5、异常被 try-catch捕获，导致@Transactional失效
+
+这种情况是最常见的一种@Transactional注解失效场景，
+
+```java
+@Transactional
+    private Integer A() throws Exception {
+        int insert = 0;
+        try {
+            CityInfoDict cityInfoDict = new CityInfoDict();
+            cityInfoDict.setCityName("2");
+            cityInfoDict.setParentCityId(2);
+            /**
+             * A 插入字段为 2的数据
+             */
+            insert = cityInfoDictMapper.insert(cityInfoDict);
+            /**
+             * B 插入字段为 3的数据
+             */
+            b.insertB();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+```
+
+如果B方法内部抛了异常，而A方法此时try catch了B方法的异常，那这个事务还能正常回滚吗？
+
+答案：不能！
+
+会抛出异常：
+
+```java
+org.springframework.transaction.UnexpectedRollbackException: Transaction rolled back because it has been marked as rollback-only
+```
+
+因为当ServiceB中抛出了一个异常以后，ServiceB标识当前事务需要rollback。但是ServiceA中由于你手动的捕获这个异常并进行处理，ServiceA认为当前事务应该正常commit。此时就出现了前后不一致，也就是因为这样，抛出了前面的UnexpectedRollbackException异常。
+
+spring的事务是在调用业务方法之前开始的，业务方法执行完毕之后才执行commit or rollback，事务是否执行取决于是否抛出runtime异常。如果抛出runtime exception 并在你的业务方法中没有catch到的话，事务会回滚。
+
+在业务方法中一般不需要catch异常，如果非要catch一定要抛出throw new RuntimeException()，或者注解中指定抛异常类型@Transactional(rollbackFor=Exception.class)，否则会导致事务失效，数据commit造成数据不一致，所以有些时候try catch反倒会画蛇添足。
+
+3.3.6、数据库引擎不支持事务，导致@Transactional失效
+
+如果使用 MySQL 且引擎是 MyISAM，则事务会不起作用，原因是 MyISAM 不支持事务，改成 InnoDB 引擎则支持事务。
 
 ## 参考链接
 

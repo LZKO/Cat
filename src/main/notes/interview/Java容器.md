@@ -563,6 +563,17 @@ public final int hashCode() {
 }
 ```
 
+JDK1.8中计算hash:
+
+```java
+//hash函数
+static final int **hash**(Object key) {
+    int h;
+    //hashCode 异或 hashCode 右移16bit
+    return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+}
+```
+
 **4.2 取模**
 
 令 x = 1<<4，即 x 为 2 的 4 次方，它具有以下性质：
@@ -1053,6 +1064,14 @@ public final class ConcurrentCache<K, V> {
 ##### 1、讲讲HashMap扩容阈值?
 
 0.75
+
+##### 2、hash了解吗？hash怎么实现
+
+hash：hash相同时，其key不一定相同，因为不同的key可能具有不同的hash，也有可能不同的key其hash是相同的；但当hash不同时，其key肯定不同。
+
+HashMap中是通过key的hashcode 异或 hashCode 无符号右移16位，即 hashcode让的低16位和高16位进行异或来实现的，这么做主要用于当hashmap 数组比较小的时候所有bit都参与运算了，防止hash冲突太大，所谓hash冲突是指不同的key计算出的hash是一样的，比如a和97，hash冲突肯定是存在的。
+
+##### 3、hash怎么优化
 
 
 
