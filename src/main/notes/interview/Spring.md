@@ -124,8 +124,7 @@ propagation代表事物传播行为，默认值为Propagation.REQUIRE
 - Propagation.REQUIRE：如果当前存在事物，则加入当前事物，如果不存在事物，则创建一个新的事物。（也就是说，A和B方法都添加了事物注解，在A方法调用了B方法，那么B方法则会加入A方法的事物当中去，把这两个事物合并成一个事物。）
 - Propagation.SUPPORTS：如果当前存在事物，则加入当前事物运行，如果不存在事物，则以非事物方式运行。
 - Propagation.MANDATORY：如果当前存在事物，则加入当前事物运行，如果不存在事物，则抛出异常。
-- Propagation.REQUIRES_NEW：重新创建一个新的事物，如果当前存在事物，暂停当前事物。（当类A中的a方法用默认事物传播行为
-- Propagation.REQUIRE，类B中的b方法加上采用Propagation.REQUIRES_NEW事物传播行为，然后在a方法中调用b方法，然而a方法抛出异常了，b方法并没有回滚，因为Propagation.REQUIRES_NEW会暂停a方法中的事物）
+- Propagation.REQUIRES_NEW：重新创建一个新的事物，如果当前存在事物，暂停当前事物。（当类A中的a方法用默认事物传播行为Propagation.REQUIRE，类B中的b方法加上采用Propagation.REQUIRES_NEW事物传播行为，然后在a方法中调用b方法，然而a方法抛出异常了，b方法并没有回滚，因为Propagation.REQUIRES_NEW会暂停a方法中的事物）
 - Propagation.NOT_SUPPORTED：以非事物的方式运行，如果当前存在事物，则暂停当前事物。
 - Propagation.NEVER：始终以非事物的方式运行，如果当前存在事物，则抛出异常。
 - Propagation.NESTED：和Propagation.REQUIRE效果一样。
