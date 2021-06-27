@@ -2,6 +2,12 @@
 
 [TOC]
 
+
+
+
+
+
+
 红黑树这段看不很懂，做点笔记
 
 ## 一、TreeNode类的treeify()方法
@@ -338,6 +344,108 @@ final Node<K, V> untreeify(HashMap<K, V> map) {
 3、参考
 
 [Java 8 HashMap（终）——TreeNode的untreeify和split方法](https://blog.csdn.net/weixin_48872249/article/details/115422757)
+
+
+
+## 五、TreeNode类的putTreeVal方法
+
+### 1、概述
+
+我们都知道，目前HashMap是采用数组+链表+红黑树的方式来存储和组织数据的。
+
+在put数据的时候，根据键的hash值寻址到具体数组位置，如果不存在hash碰撞，那么这个位置就只存储这么一个键值对。参见：put方法分析
+
+如果两个key的hash值相同，那么对应数组位置上就需要用链表的方式将这两个数据组织起来，当同一个位置上链表中的元素达到8个的时候，就会再将这些元素构建成一个红黑树（参见：treeifyBin方法分析），同时把原来的单链表结构变成了双链表结构，也就是这些元素即维持着红黑树的结构又维持着双链表的结构。当第9个相同hash值的键值对put过来时，发现该位置已经是一个树节点了，那么就会调用putTreeVal方法，将这个新的值设置到指定的key上。
+
+### 2、方法解析
+
+```java
+/**
+ * 当存在hash碰撞的时候，且元素数量大于8个时候，就会以红黑树的方式将这些元素组织起来
+ * map 当前节点所在的HashMap对象
+ * tab 当前HashMap对象的元素数组
+ * h   指定key的hash值
+ * k   指定key
+ * v   指定key上要写入的值
+ * 返回：指定key所匹配到的节点对象，针对这个对象去修改V（返回空说明创建了一个新节点）
+ */
+final TreeNode<K,V> putTreeVal(HashMap<K,V> map, Node<K,V>[] tab,
+                                int h, K k, V v) {
+    Class<?> kc = null; // 定义k的Class对象
+    boolean searched = false; // 标识是否已经遍历过一次树，未必是从根节点遍历的，但是遍历路径上一定已经包含了后续需要比对的所有节点。
+    TreeNode<K,V> root = (parent != null) ? root() : this; // 父节点不为空那么查找根节点，为空那么自身就是根节点
+    for (TreeNode<K,V> p = root;;) { // 从根节点开始遍历，没有终止条件，只能从内部退出
+        int dir, ph; K pk; // 声明方向、当前节点hash值、当前节点的键对象
+        if ((ph = p.hash) > h) // 如果当前节点hash 大于 指定key的hash值
+            dir = -1; // 要添加的元素应该放置在当前节点的左侧
+        else if (ph < h) // 如果当前节点hash 小于 指定key的hash值
+            dir = 1; // 要添加的元素应该放置在当前节点的右侧
+        else if ((pk = p.key) == k || (k != null && k.equals(pk))) // 如果当前节点的键对象 和 指定key对象相同
+            return p; // 那么就返回当前节点对象，在外层方法会对v进行写入
+ 
+        // 走到这一步说明 当前节点的hash值  和 指定key的hash值  是相等的，但是equals不等
+        else if ((kc == null &&
+                    (kc = comparableClassFor(k)) == null) ||
+                    (dir = compareComparables(kc, k, pk)) == 0) {
+ 
+            // 走到这里说明：指定key没有实现comparable接口   或者   实现了comparable接口并且和当前节点的键对象比较之后相等（仅限第一次循环）
+        
+ 
+            /*
+             * searched 标识是否已经对比过当前节点的左右子节点了
+             * 如果还没有遍历过，那么就递归遍历对比，看是否能够得到那个键对象equals相等的的节点
+             * 如果得到了键的equals相等的的节点就返回
+             * 如果还是没有键的equals相等的节点，那说明应该创建一个新节点了
+             */
+            if (!searched) { // 如果还没有比对过当前节点的所有子节点
+                TreeNode<K,V> q, ch; // 定义要返回的节点、和子节点
+                searched = true; // 标识已经遍历过一次了
+                /*
+                 * 红黑树也是二叉树，所以只要沿着左右两侧遍历寻找就可以了
+                 * 这是个短路运算，如果先从左侧就已经找到了，右侧就不需要遍历了
+                 * find 方法内部还会有递归调用。参见：find方法解析
+                 */
+                if (((ch = p.left) != null &&
+                        (q = ch.find(h, k, kc)) != null) ||
+                    ((ch = p.right) != null &&
+                        (q = ch.find(h, k, kc)) != null))
+                    return q; // 找到了指定key键对应的
+            }
+ 
+            // 走到这里就说明，遍历了所有子节点也没有找到和当前键equals相等的节点
+            dir = tieBreakOrder(k, pk); // 再比较一下当前节点键和指定key键的大小
+        }
+ 
+        TreeNode<K,V> xp = p; // 定义xp指向当前节点
+        /*
+        * 如果dir小于等于0，那么看当前节点的左节点是否为空，如果为空，就可以把要添加的元素作为当前节点的左节点，如果不为空，还需要下一轮继续比较
+        * 如果dir大于等于0，那么看当前节点的右节点是否为空，如果为空，就可以把要添加的元素作为当前节点的右节点，如果不为空，还需要下一轮继续比较
+        * 如果以上两条当中有一个子节点不为空，这个if中还做了一件事，那就是把p已经指向了对应的不为空的子节点，开始下一轮的比较
+        */
+        if ((p = (dir <= 0) ? p.left : p.right) == null) {  
+            // 如果恰好要添加的方向上的子节点为空，此时节点p已经指向了这个空的子节点
+            Node<K,V> xpn = xp.next; // 获取当前节点的next节点
+            TreeNode<K,V> x = map.newTreeNode(h, k, v, xpn); // 创建一个新的树节点
+            if (dir <= 0)
+                xp.left = x;  // 左孩子指向到这个新的树节点
+            else
+                xp.right = x; // 右孩子指向到这个新的树节点
+            xp.next = x; // 链表中的next节点指向到这个新的树节点
+            x.parent = x.prev = xp; // 这个新的树节点的父节点、前节点均设置为 当前的树节点
+            if (xpn != null) // 如果原来的next节点不为空
+                ((TreeNode<K,V>)xpn).prev = x; // 那么原来的next节点的前节点指向到新的树节点
+            moveRootToFront(tab, balanceInsertion(root, x));// 重新平衡，以及新的根节点置顶
+            return null; // 返回空，意味着产生了一个新节点
+        }
+    }
+}
+```
+
+
+
+### 3、参考
+
+[JDK8：HashMap源码解析：TreeNode类的putTreeVal方法](https://blog.csdn.net/weixin_42340670/article/details/80635008)
 
 ## 六、remove方法、removeNode方法
 
@@ -1328,8 +1436,6 @@ final Node<K,V> untreeify(HashMap<K,V> map) {
 ### 3、参考
 
 [HashMap1.8 源码解析(3)--TreeNode(红黑树) 包括每一个方法](https://www.jianshu.com/p/91215c6d061f)
-
-
 
 
 
