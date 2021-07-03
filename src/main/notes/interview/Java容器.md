@@ -748,6 +748,10 @@ static final int tableSizeFor(int cap) {
 - HashMap 的迭代器是 fail-fast 迭代器。
 - HashMap 不能保证随着时间的推移 Map 中的元素次序是不变的。
 
+##### 10、源码解读
+
+[源码解读](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/HashMap源码导读.md)
+
 #### ConcurrentHashMap
 
 ##### 1. 存储结构
@@ -1237,9 +1241,21 @@ a % n == (n-1) & a，当n是2的指数时，等式成立。
 
 
 
+##### 9、集合大小为什么是2的幂
 
+在进行扩容时，需要把键值对重新计算桶下标，从而放到对应的桶上。在前面提到，HashMap 使用 hash%capacity 来确定桶下标。HashMap capacity 为 2 的 n 次方这一特点能够极大降低重新计算桶下标操作的复杂度。
 
+假设原数组长度 capacity 为 16，扩容之后 new capacity 为 32：
 
+```
+capacity     : 00010000
+new capacity : 00100000
+```
+
+对于一个 Key，它的哈希值 hash 在第 5 位：
+
+- 为 0，那么 hash%00010000 = hash%00100000，桶位置和原来一致；
+- 为 1，hash%00010000 = hash%00100000 + 16，桶位置是原位置 + 16。
 
 
 
