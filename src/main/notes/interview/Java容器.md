@@ -879,6 +879,10 @@ JDK 1.8 使用了 CAS 操作来支持更高的并发度，在 CAS 操作失败�
 
 并且 JDK 1.8 的实现也在链表过长时会转换为红黑树。
 
+##### 4.源码解读
+
+[源码解读](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/ConcurrentHashMap源码导读.md)
+
 #### LinkedHashMap
 
 ##### 存储结构
