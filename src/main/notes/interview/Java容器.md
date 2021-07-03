@@ -1261,6 +1261,28 @@ new capacity : 00100000
 - 为 0，那么 hash%00010000 = hash%00100000，桶位置和原来一致；
 - 为 1，hash%00010000 = hash%00100000 + 16，桶位置是原位置 + 16。
 
+##### 10、ConcurrentHashMap  jdk1.7,jkd1.8区别
+
+JDK 1.7 使用分段锁机制来实现并发更新操作，核心类为 Segment，它继承自重入锁 ReentrantLock，并发度与 Segment 数量相等。
+
+JDK 1.8 使用了 CAS 操作来支持更高的并发度，在 CAS 操作失败时使用内置锁 synchronized。
+
+并且 JDK 1.8 的实现也在链表过长时会转换为红黑树。
+
+
+
+JDK1.8版本的ConcurrentHashMap的数据结构已经接近HashMap，相对而言，ConcurrentHashMap只是增加了同步的操作来控制并发，从JDK1.7版本的ReentrantLock+Segment+HashEntry，到JDK1.8版本中synchronized+CAS+HashEntry+红黑树。
+
+1.数据结构：取消了Segment分段锁的数据结构，取而代之的是数组+链表+红黑树的结构。
+2.保证线程安全机制：JDK1.7采用segment的分段锁机制实现线程安全，其中segment继承自ReentrantLock。JDK1.8采用CAS+Synchronized保证线程安全。
+3.锁的粒度：原来是对需要进行数据操作的Segment加锁，现调整为对每个数组元素加锁（Node）。
+4.链表转化为红黑树:定位结点的hash算法简化会带来弊端,Hash冲突加剧,因此在链表节点数量大于8时，会将链表转化为红黑树进行存储。
+5.查询时间复杂度：从原来的遍历链表O(n)，变成遍历红黑树O(logN)。
+
+
+
+
+
 
 
 
