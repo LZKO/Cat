@@ -243,6 +243,14 @@ static <K,V> TreeNode<K,V> rotateRight(TreeNode<K,V> root,
 
 ![](C:\lyy\project_workspace\Cat\src\main\resources\pic\java\hashmap\hashmap1.jpg)
 
+测试图片
+
+![](..\..\resources\pic\java\hashmap\hashmap1.jpg)
+
+
+
+
+
 
 
 #### 3.2、有旋转
