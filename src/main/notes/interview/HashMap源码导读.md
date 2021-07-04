@@ -245,7 +245,7 @@ static <K,V> TreeNode<K,V> rotateRight(TreeNode<K,V> root,
 
 测试图片
 
-![](..\..\resources\pic\java\hashmap\hashmap1.jpg)
+![](https://github.com/LZKO/Cat/blob/master/src/main/resources/pic/java/hashmap/hashmap1.jpg)
 
 
 
