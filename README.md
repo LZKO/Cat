@@ -63,6 +63,8 @@ Leetcode-Database 题解：略，可以参考此链接
 
 [synchronized介绍](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/synchronized介绍.md)
 
+[volatile介绍](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/volatile介绍.md)
+
 ## 系统设计
 
 [系统设计基础](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/系统设计基础.md)
