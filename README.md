@@ -65,6 +65,8 @@ Leetcode-Database 题解：略，可以参考此链接
 
 [volatile介绍](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/volatile介绍.md)
 
+[单例模式+volatile禁止指令重排序](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/单例模式+volatile禁止指令重排序.md)
+
 ## 系统设计
 
 [系统设计基础](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/系统设计基础.md)
