@@ -73,6 +73,8 @@ Leetcode-Database 题解：略，可以参考此链接
 
 [ReentrantLock原理分析](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/ReentrantLock原理分析.md)
 
+[AQS-共享模式分析](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/AQS-共享模式分析.md)
+
 ## 系统设计
 
 [系统设计基础](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/系统设计基础.md)
