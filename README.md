@@ -71,6 +71,8 @@ Leetcode-Database 题解：略，可以参考此链接
 
 [AQS-Condition介绍](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/AQS-Condition介绍.md)
 
+[ReentrantLock原理分析](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/ReentrantLock原理分析.md)
+
 ## 系统设计
 
 [系统设计基础](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/系统设计基础.md)
