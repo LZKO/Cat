@@ -77,6 +77,8 @@ Leetcode-Database 题解：略，可以参考此链接
 
 [Semaphore原理分析](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/Semaphore原理分析.md)
 
+[ThreadLocal原理分析](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/ThreadLocal原理分析.md)
+
 ## 系统设计
 
 [系统设计基础](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/系统设计基础.md)
