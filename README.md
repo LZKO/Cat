@@ -83,6 +83,8 @@ Leetcode-Database 题解：略，可以参考此链接
 
 [ArrayBlockingQueue原理分析(二)-迭代器](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/ArrayBlockingQueue原理分析(二)-迭代器.md)
 
+[LinkedBlockingQueue原理分析](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/LinkedBlockingQueue原理分析.md)
+
 ## 系统设计
 
 [系统设计基础](https://github.com/LZKO/Cat/blob/master/src/main/notes/interview/系统设计基础.md)
